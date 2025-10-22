@@ -22,45 +22,116 @@ const App = () => {
     setIsLoadingScores(true);
     try {
       const response = await fetch('https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=2025&seasontype=2&week=7');
-      // https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard
-      // https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=2025&seasontype=2&week=7
+      
       if (!response.ok) {
         throw new Error('Failed to fetch scores');
       }
 
       const data = await response.json();
       
-      const teamNameMap = {
-        'Steelers': 'Pittsburgh',
-        'Bengals': 'Cincinnati',
-        'Rams': 'LA Rams',
-        'Jaguars': 'Jacksonville',
-        'Saints': 'New Orleans',
-        'Bears': 'Chicago',
-        'Dolphins': 'Miami',
-        'Browns': 'Cleveland',
-        'Patriots': 'New England',
-        'Titans': 'Tennessee',
-        'Raiders': 'Las Vegas',
-        'Chiefs': 'Kansas City',
-        'Eagles': 'Philadelphia',
-        'Vikings': 'Minnesota',
-        'Panthers': 'Carolina',
-        'Jets': 'NY Jets',
-        'Giants': 'NY Giants',
-        'Broncos': 'Denver',
-        'Colts': 'Indianapolis',
-        'Chargers': 'LA Chargers',
-        'Commanders': 'Washington',
-        'Cowboys': 'Dallas',
-        'Packers': 'Green Bay',
-        'Cardinals': 'Arizona',
-        'Falcons': 'Atlanta',
-        '49ers': 'San Francisco',
-        'Buccaneers': 'Tampa Bay',
-        'Lions': 'Detroit',
-        'Texans': 'Houston',
-        'Seahawks': 'Seattle'
+      // Create a comprehensive team name mapping that works both ways
+      const normalizeTeamName = (teamName) => {
+        const teamMap = {
+          // Map all variations to a canonical name
+          'Steelers': 'Pittsburgh',
+          'Pittsburgh Steelers': 'Pittsburgh',
+          'Pittsburgh': 'Pittsburgh',
+          'Bengals': 'Cincinnati',
+          'Cincinnati Bengals': 'Cincinnati',
+          'Cincinnati': 'Cincinnati',
+          'Rams': 'LA Rams',
+          'Los Angeles Rams': 'LA Rams',
+          'LA Rams': 'LA Rams',
+          'Jaguars': 'Jacksonville',
+          'Jacksonville Jaguars': 'Jacksonville',
+          'Jacksonville': 'Jacksonville',
+          'Saints': 'New Orleans',
+          'New Orleans Saints': 'New Orleans',
+          'New Orleans': 'New Orleans',
+          'Bears': 'Chicago',
+          'Chicago Bears': 'Chicago',
+          'Chicago': 'Chicago',
+          'Dolphins': 'Miami',
+          'Miami Dolphins': 'Miami',
+          'Miami': 'Miami',
+          'Browns': 'Cleveland',
+          'Cleveland Browns': 'Cleveland',
+          'Cleveland': 'Cleveland',
+          'Patriots': 'New England',
+          'New England Patriots': 'New England',
+          'New England': 'New England',
+          'Titans': 'Tennessee',
+          'Tennessee Titans': 'Tennessee',
+          'Tennessee': 'Tennessee',
+          'Raiders': 'Las Vegas',
+          'Las Vegas Raiders': 'Las Vegas',
+          'Las Vegas': 'Las Vegas',
+          'Chiefs': 'Kansas City',
+          'Kansas City Chiefs': 'Kansas City',
+          'Kansas City': 'Kansas City',
+          'Eagles': 'Philadelphia',
+          'Philadelphia Eagles': 'Philadelphia',
+          'Philadelphia': 'Philadelphia',
+          'Vikings': 'Minnesota',
+          'Minnesota Vikings': 'Minnesota',
+          'Minnesota': 'Minnesota',
+          'Panthers': 'Carolina',
+          'Carolina Panthers': 'Carolina',
+          'Carolina': 'Carolina',
+          'Jets': 'NY Jets',
+          'New York Jets': 'NY Jets',
+          'NY Jets': 'NY Jets',
+          'Giants': 'NY Giants',
+          'New York Giants': 'NY Giants',
+          'NY Giants': 'NY Giants',
+          'Broncos': 'Denver',
+          'Denver Broncos': 'Denver',
+          'Denver': 'Denver',
+          'Colts': 'Indianapolis',
+          'Indianapolis Colts': 'Indianapolis',
+          'Indianapolis': 'Indianapolis',
+          'Chargers': 'LA Chargers',
+          'Los Angeles Chargers': 'LA Chargers',
+          'LA Chargers': 'LA Chargers',
+          'Commanders': 'Washington',
+          'Washington Commanders': 'Washington',
+          'Washington': 'Washington',
+          'Cowboys': 'Dallas',
+          'Dallas Cowboys': 'Dallas',
+          'Dallas': 'Dallas',
+          'Packers': 'Green Bay',
+          'Green Bay Packers': 'Green Bay',
+          'Green Bay': 'Green Bay',
+          'Cardinals': 'Arizona',
+          'Arizona Cardinals': 'Arizona',
+          'Arizona': 'Arizona',
+          'Falcons': 'Atlanta',
+          'Atlanta Falcons': 'Atlanta',
+          'Atlanta': 'Atlanta',
+          '49ers': 'San Francisco',
+          'San Francisco 49ers': 'San Francisco',
+          'San Francisco': 'San Francisco',
+          'Buccaneers': 'Tampa Bay',
+          'Tampa Bay Buccaneers': 'Tampa Bay',
+          'Tampa Bay': 'Tampa Bay',
+          'Lions': 'Detroit',
+          'Detroit Lions': 'Detroit',
+          'Detroit': 'Detroit',
+          'Texans': 'Houston',
+          'Houston Texans': 'Houston',
+          'Houston': 'Houston',
+          'Seahawks': 'Seattle',
+          'Seattle Seahawks': 'Seattle',
+          'Seattle': 'Seattle',
+          'Ravens': 'Baltimore',
+          'Baltimore Ravens': 'Baltimore',
+          'Baltimore': 'Baltimore',
+          'Bills': 'Buffalo',
+          'Buffalo Bills': 'Buffalo',
+          'Buffalo': 'Buffalo'
+        };
+        
+        return teamMap[teamName] || teamName;
       };
 
       const updatedGames = games.map(game => {
@@ -68,12 +139,18 @@ const App = () => {
           const homeTeam = event.competitions[0].competitors.find(c => c.homeAway === 'home');
           const awayTeam = event.competitions[0].competitors.find(c => c.homeAway === 'away');
           
-          const homeTeamName = teamNameMap[homeTeam.team.displayName] || homeTeam.team.displayName;
-          const awayTeamName = teamNameMap[awayTeam.team.displayName] || awayTeam.team.displayName;
-          console.log('homeTeamName: ' + homeTeamName);
-          console.log('awayTeamName: ' + awayTeamName);
-          return (homeTeamName === game.homeTeam || homeTeam.team.displayName.includes(game.homeTeam)) &&
-                 (awayTeamName === game.awayTeam || awayTeam.team.displayName.includes(game.awayTeam));
+          const espnHomeName = normalizeTeamName(homeTeam.team.displayName);
+          const espnAwayName = normalizeTeamName(awayTeam.team.displayName);
+          const gameHomeName = normalizeTeamName(game.homeTeam);
+          const gameAwayName = normalizeTeamName(game.awayTeam);
+          
+          const match = espnHomeName === gameHomeName && espnAwayName === gameAwayName;
+          
+          if (match) {
+            console.log(`✓ Matched: ${game.awayTeam} @ ${game.homeTeam}`);
+          }
+          
+          return match;
         });
 
         if (espnEvent) {
@@ -111,10 +188,13 @@ const App = () => {
               status: 'scheduled'
             };
           }
+        } else {
+          console.log(`✗ No match found for: ${game.awayTeam} @ ${game.homeTeam}`);
         }
         
         return game;
       });
+      
       console.log('updatedGames: ' + JSON.stringify(updatedGames));
       setGames(updatedGames);
       setLastScoreUpdate(new Date());
@@ -621,16 +701,6 @@ const App = () => {
                     {game.awayTeam} @ {game.homeTeam}
                   </div>
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => updateGameWinner(game.id, game.awayTeam)}
-                      className={`flex-1 px-3 py-2 rounded text-sm ${
-                        game.winner === game.awayTeam
-                          ? 'bg-green-600 text-white'
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
-                    >
-                      {game.awayTeam}
-                    </button>
                     <button
                       onClick={() => updateGameWinner(game.id, game.homeTeam)}
                       className={`flex-1 px-3 py-2 rounded text-sm ${
