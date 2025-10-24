@@ -12,6 +12,7 @@ const App = () => {
   const [weekNumber, setWeekNumber] = useState('7');
   const [year, setYear] = useState('2025');
   const [seasonType, setSeasonType] = useState('2');
+  const [espnApiUrl, setEspnApiUrl] = useState('https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard');
   const [isAdminMode, setIsAdminMode] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -58,6 +59,12 @@ const App = () => {
   }, [seasonType, isLoading]);
 
   React.useEffect(() => {
+    if (!isLoading) {
+      saveToStorage('pickem-espn-api-url', espnApiUrl);
+    }
+  }, [espnApiUrl, isLoading]);
+
+  React.useEffect(() => {
     if (!isLoading && lastScoreUpdate) {
       saveToStorage('pickem-last-update', lastScoreUpdate.toISOString());
     }
@@ -101,6 +108,12 @@ const App = () => {
       const savedSeasonType = sessionStorage.getItem('pickem-season-type');
       if (savedSeasonType) {
         setSeasonType(savedSeasonType);
+      }
+
+      // Load ESPN API URL
+      const savedEspnUrl = sessionStorage.getItem('pickem-espn-api-url');
+      if (savedEspnUrl) {
+        setEspnApiUrl(savedEspnUrl);
       }
 
       // Load last update
@@ -159,6 +172,7 @@ const App = () => {
       'pickem-week',
       'pickem-year', 
       'pickem-season-type',
+      'pickem-espn-api-url',
       'pickem-last-update'
     ];
     keys.forEach(key => sessionStorage.removeItem(key));
@@ -172,6 +186,7 @@ const App = () => {
       weekNumber,
       year,
       seasonType,
+      espnApiUrl,
       lastScoreUpdate: lastScoreUpdate?.toISOString(),
       exportDate: new Date().toISOString()
     };
@@ -217,6 +232,9 @@ const App = () => {
         if (data.seasonType) {
           setSeasonType(data.seasonType);
         }
+        if (data.espnApiUrl) {
+          setEspnApiUrl(data.espnApiUrl);
+        }
         if (data.lastScoreUpdate) {
           setLastScoreUpdate(new Date(data.lastScoreUpdate));
         }
@@ -242,7 +260,8 @@ const App = () => {
 
     setIsLoadingScores(true);
     try {
-      const response = await fetch('https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=2025&seasontype=2&week=7');
+      const apiUrl = `${espnApiUrl}?dates=${year}&seasontype=${seasonType}&week=${weekNumber}`;
+      const response = await fetch(apiUrl);
       
       if (!response.ok) {
         throw new Error('Failed to fetch scores');
@@ -671,6 +690,62 @@ const App = () => {
                     className="hidden"
                   />
                 </label>
+              </div>
+
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8">
+                <h3 className="text-lg font-semibold text-gray-700 mb-4">
+                  Configuration
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Week Number
+                    </label>
+                    <input
+                      type="number"
+                      value={weekNumber}
+                      onChange={(e) => setWeekNumber(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Year
+                    </label>
+                    <input
+                      type="number"
+                      value={year}
+                      onChange={(e) => setYear(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Season Type
+                    </label>
+                    <select
+                      value={seasonType}
+                      onChange={(e) => setSeasonType(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="1">Preseason</option>
+                      <option value="2">Regular Season</option>
+                      <option value="3">Postseason</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    ESPN API URL
+                  </label>
+                  <input
+                    type="url"
+                    value={espnApiUrl}
+                    onChange={(e) => setEspnApiUrl(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard"
+                  />
+                </div>
               </div>
 
               {uploadMessage && (
