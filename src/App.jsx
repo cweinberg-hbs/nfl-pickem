@@ -10,7 +10,228 @@ const App = () => {
   const [isLoadingScores, setIsLoadingScores] = useState(false);
   const [lastScoreUpdate, setLastScoreUpdate] = useState(null);
   const [weekNumber, setWeekNumber] = useState('7');
+  const [year, setYear] = useState('2025');
+  const [seasonType, setSeasonType] = useState('2');
   const [isAdminMode, setIsAdminMode] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load data from session storage on mount
+  React.useEffect(() => {
+    loadFromStorage();
+  }, []);
+
+  // Save data to session storage whenever state changes
+  React.useEffect(() => {
+    if (!isLoading) {
+      saveToStorage('pickem-games', games);
+    }
+  }, [games, isLoading]);
+
+  React.useEffect(() => {
+    if (!isLoading) {
+      saveToStorage('pickem-players', players);
+    }
+  }, [players, isLoading]);
+
+  React.useEffect(() => {
+    if (!isLoading && activePlayer !== null) {
+      saveToStorage('pickem-active-player', activePlayer.toString());
+    }
+  }, [activePlayer, isLoading]);
+
+  React.useEffect(() => {
+    if (!isLoading) {
+      saveToStorage('pickem-week', weekNumber);
+    }
+  }, [weekNumber, isLoading]);
+
+  React.useEffect(() => {
+    if (!isLoading) {
+      saveToStorage('pickem-year', year);
+    }
+  }, [year, isLoading]);
+
+  React.useEffect(() => {
+    if (!isLoading) {
+      saveToStorage('pickem-season-type', seasonType);
+    }
+  }, [seasonType, isLoading]);
+
+  React.useEffect(() => {
+    if (!isLoading && lastScoreUpdate) {
+      saveToStorage('pickem-last-update', lastScoreUpdate.toISOString());
+    }
+  }, [lastScoreUpdate, isLoading]);
+
+  const loadFromStorage = () => {
+    try {
+      // Load games
+      const savedGames = sessionStorage.getItem('pickem-games');
+      if (savedGames) {
+        const loadedGames = JSON.parse(savedGames);
+        setGames(loadedGames);
+        setIsAdminMode(false);
+      }
+
+      // Load players
+      const savedPlayers = sessionStorage.getItem('pickem-players');
+      if (savedPlayers) {
+        setPlayers(JSON.parse(savedPlayers));
+      }
+
+      // Load active player
+      const savedActivePlayer = sessionStorage.getItem('pickem-active-player');
+      if (savedActivePlayer) {
+        setActivePlayer(parseInt(savedActivePlayer));
+      }
+
+      // Load week number
+      const savedWeek = sessionStorage.getItem('pickem-week');
+      if (savedWeek) {
+        setWeekNumber(savedWeek);
+      }
+
+      // Load year
+      const savedYear = sessionStorage.getItem('pickem-year');
+      if (savedYear) {
+        setYear(savedYear);
+      }
+
+      // Load season type
+      const savedSeasonType = sessionStorage.getItem('pickem-season-type');
+      if (savedSeasonType) {
+        setSeasonType(savedSeasonType);
+      }
+
+      // Load last update
+      const savedLastUpdate = sessionStorage.getItem('pickem-last-update');
+      if (savedLastUpdate) {
+        setLastScoreUpdate(new Date(savedLastUpdate));
+      }
+
+    } catch (error) {
+      console.log('No previous data found or error loading:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const saveToStorage = (key, value) => {
+    try {
+      if (typeof value === 'object') {
+        sessionStorage.setItem(key, JSON.stringify(value));
+      } else {
+        sessionStorage.setItem(key, value);
+      }
+    } catch (error) {
+      console.error('Error saving to session storage:', error);
+      // Handle storage quota exceeded
+      if (error.name === 'QuotaExceededError') {
+        console.warn('Session storage quota exceeded. Clearing old data...');
+        clearOldData();
+        // Try saving again
+        try {
+          if (typeof value === 'object') {
+            sessionStorage.setItem(key, JSON.stringify(value));
+          } else {
+            sessionStorage.setItem(key, value);
+          }
+        } catch (retryError) {
+          console.error('Failed to save even after clearing old data:', retryError);
+        }
+      }
+    }
+  };
+
+  const clearOldData = () => {
+    // Clear non-essential data first
+    const nonEssentialKeys = ['pickem-last-update'];
+    nonEssentialKeys.forEach(key => {
+      sessionStorage.removeItem(key);
+    });
+  };
+
+  const clearAllData = () => {
+    const keys = [
+      'pickem-games',
+      'pickem-players', 
+      'pickem-active-player',
+      'pickem-week',
+      'pickem-year', 
+      'pickem-season-type',
+      'pickem-last-update'
+    ];
+    keys.forEach(key => sessionStorage.removeItem(key));
+  };
+
+  const exportData = () => {
+    const data = {
+      games,
+      players,
+      activePlayer,
+      weekNumber,
+      year,
+      seasonType,
+      lastScoreUpdate: lastScoreUpdate?.toISOString(),
+      exportDate: new Date().toISOString()
+    };
+    
+    const dataStr = JSON.stringify(data, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `pickem-week${weekNumber}-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const importData = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        
+        // Validate data structure
+        if (data.games && Array.isArray(data.games)) {
+          setGames(data.games);
+        }
+        if (data.players && Array.isArray(data.players)) {
+          setPlayers(data.players);
+        }
+        if (data.activePlayer) {
+          setActivePlayer(data.activePlayer);
+        }
+        if (data.weekNumber) {
+          setWeekNumber(data.weekNumber);
+        }
+        if (data.year) {
+          setYear(data.year);
+        }
+        if (data.seasonType) {
+          setSeasonType(data.seasonType);
+        }
+        if (data.lastScoreUpdate) {
+          setLastScoreUpdate(new Date(data.lastScoreUpdate));
+        }
+        
+        setUploadMessage('✓ Data imported successfully!');
+        setTimeout(() => setUploadMessage(''), 3000);
+      } catch (error) {
+        console.error('Error importing data:', error);
+        setUploadMessage('❌ Error importing data. Please check file format.');
+        setTimeout(() => setUploadMessage(''), 5000);
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  };
 
   const fetchLiveScores = async () => {
     if (games.length === 0) {
@@ -389,7 +610,7 @@ const App = () => {
     return pick === game.winner ? 'correct' : 'incorrect';
   };
 
-  // Admin setup view
+// Admin setup view
   if (isAdminMode) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4 flex items-center justify-center">
@@ -404,9 +625,10 @@ const App = () => {
               <div>
                 <h2 className="text-xl font-semibold text-gray-700 mb-2">Admin Instructions:</h2>
                 <ol className="list-decimal list-inside space-y-2 text-gray-600">
-                  <li>Upload the weekly pick sheet</li>
-                  <li>The app will extract all games and create a pick interface</li>
-                  <li>Players can then make their picks through the web interface</li>
+                  <li>Upload the weekly pick sheet to set up games</li>
+                  <li>Or restore a previous week from exported data</li>
+                  <li>Add players and have them make picks through the web interface</li>
+                  <li>Update scores automatically from ESPN or manually</li>
                   <li>Track scores and leaderboard in real-time</li>
                 </ol>
               </div>
@@ -431,9 +653,65 @@ const App = () => {
                 </label>
               </div>
 
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-700 mb-2">
+                  Import Previous Data
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Restore games and picks from an exported file
+                </p>
+                <label className="inline-block px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors cursor-pointer">
+                  <FileText className="w-5 h-5 inline mr-2" />
+                  Import JSON File
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={importData}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
               {uploadMessage && (
-                <div className="p-3 bg-blue-100 border border-blue-400 text-blue-700 rounded-lg">
+                <div className={`p-3 rounded-lg ${
+                  uploadMessage.includes('âœ"') ? 'bg-green-100 border border-green-400 text-green-700' :
+                  uploadMessage.includes('âŒ') || uploadMessage.includes('âš ï¸') ? 'bg-red-100 border border-red-400 text-red-700' :
+                  'bg-blue-100 border border-blue-400 text-blue-700'
+                }`}>
                   {uploadMessage}
+                </div>
+              )}
+
+              {games.length > 0 && (
+                <div className="border-t pt-4">
+                  <h3 className="text-lg font-semibold text-gray-700 mb-2">
+                    Data Management
+                  </h3>
+                  <div className="flex gap-3 flex-wrap">
+                    <button
+                      onClick={exportData}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Export Data
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm('This will clear all data for this week. Continue?')) {
+                          clearAllData();
+                          setGames([]);
+                          setPlayers([]);
+                          setActivePlayer(null);
+                          setUploadMessage('âœ" All data cleared');
+                          setTimeout(() => setUploadMessage(''), 3000);
+                        }
+                      }}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      Clear All Data
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
