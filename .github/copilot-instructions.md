@@ -4,9 +4,11 @@
 Single-page React app for managing NFL weekly pick'em games. Built with Vite + React + TailwindCSS, featuring real-time score updates from ESPN API and session storage persistence.
 
 ## Architecture & Data Flow
-- **Single Component Design**: Everything lives in `App.jsx` (~800+ lines) - intentionally monolithic for simplicity
+- **Single Component Design**: Everything lives in `App.jsx` (~1300+ lines) - intentionally monolithic for simplicity
 - **State Management**: React hooks with session storage persistence (no external state library)
-- **Data Persistence**: Session storage with automatic save/load, export/import JSON functionality
+- **Data Persistence**: Dual-layer approach:
+  - Session storage for local persistence and offline capability
+  - GitHub Gist API for cloud persistence and week-to-week history tracking
 - **External API**: ESPN NFL Scoreboard API for live score updates with comprehensive team name normalization
 
 ## Key State Structure
@@ -32,6 +34,13 @@ Text file uploads parse games using regex patterns for "Team at/vs Team Time" fo
 
 ### Session Storage Strategy
 Each state change auto-saves to session storage with error handling for quota exceeded. Export/import provides backup/restore functionality.
+
+### Cloud Persistence (GitHub Gist)
+- Uses GitHub Personal Access Token for authentication
+- Each week stored as separate private gist with structured JSON
+- Automatic history tracking of previous weeks
+- Load any previous week from cloud storage
+- Enables long-term winner tracking across seasons
 
 ## Development Workflows
 
@@ -78,6 +87,7 @@ ESPN API settings are configurable via admin setup:
 ## External Dependencies
 - **Lucide React**: Icons throughout the UI
 - **ESPN API**: Configurable URL, defaults to NFL scoreboard (no auth required)
+- **GitHub Gist API**: Cloud persistence with Personal Access Token authentication
 
 ## Common Modifications
 - Update team name mappings in `normalizeTeamName()` for new ESPN variations
