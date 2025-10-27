@@ -36,7 +36,7 @@ Text file uploads parse games using regex patterns for "Team at/vs Team Time" fo
 Each state change auto-saves to session storage with error handling for quota exceeded. Export/import provides backup/restore functionality.
 
 ### Cloud Persistence (GitHub Gist)
-- Uses GitHub Personal Access Token for authentication
+- Uses GitHub Personal Access Token via environment variables (secure)
 - Each week stored as separate private gist with structured JSON
 - Automatic history tracking of previous weeks
 - Load any previous week from cloud storage
@@ -87,7 +87,7 @@ ESPN API settings are configurable via admin setup:
 ## External Dependencies
 - **Lucide React**: Icons throughout the UI
 - **ESPN API**: Configurable URL, defaults to NFL scoreboard (no auth required)
-- **GitHub Gist API**: Cloud persistence with Personal Access Token authentication
+- **GitHub Gist API**: Cloud persistence with secure environment variable authentication
 
 ## Common Modifications
 - Update team name mappings in `normalizeTeamName()` for new ESPN variations
