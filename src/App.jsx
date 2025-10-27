@@ -13,8 +13,12 @@ const App = () => {
   const [year, setYear] = useState('2025');
   const [seasonType, setSeasonType] = useState('2');
   const [espnApiUrl, setEspnApiUrl] = useState('https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard');
+  const [githubToken, setGithubToken] = useState('');
+  const [currentGistId, setCurrentGistId] = useState(null);
   const [isAdminMode, setIsAdminMode] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [weekHistory, setWeekHistory] = useState([]);
 
   // Load data from session storage on mount
   React.useEffect(() => {
@@ -63,6 +67,18 @@ const App = () => {
       saveToStorage('pickem-espn-api-url', espnApiUrl);
     }
   }, [espnApiUrl, isLoading]);
+
+  React.useEffect(() => {
+    if (!isLoading) {
+      saveToStorage('pickem-github-token', githubToken);
+    }
+  }, [githubToken, isLoading]);
+
+  React.useEffect(() => {
+    if (!isLoading && currentGistId) {
+      saveToStorage('pickem-gist-id', currentGistId);
+    }
+  }, [currentGistId, isLoading]);
 
   React.useEffect(() => {
     if (!isLoading && lastScoreUpdate) {
@@ -114,6 +130,18 @@ const App = () => {
       const savedEspnUrl = sessionStorage.getItem('pickem-espn-api-url');
       if (savedEspnUrl) {
         setEspnApiUrl(savedEspnUrl);
+      }
+
+      // Load GitHub token
+      const savedToken = sessionStorage.getItem('pickem-github-token');
+      if (savedToken) {
+        setGithubToken(savedToken);
+      }
+
+      // Load current gist ID
+      const savedGistId = sessionStorage.getItem('pickem-gist-id');
+      if (savedGistId) {
+        setCurrentGistId(savedGistId);
       }
 
       // Load last update
@@ -173,10 +201,168 @@ const App = () => {
       'pickem-year', 
       'pickem-season-type',
       'pickem-espn-api-url',
+      'pickem-github-token',
+      'pickem-gist-id',
       'pickem-last-update'
     ];
     keys.forEach(key => sessionStorage.removeItem(key));
   };
+
+  // GitHub Gist persistence functions
+  const saveWeekToGist = async () => {
+    if (!githubToken) {
+      setUploadMessage('⚠️ GitHub token required for saving to cloud');
+      setTimeout(() => setUploadMessage(''), 3000);
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const weekData = {
+        weekNumber,
+        year,
+        seasonType,
+        games,
+        players,
+        leaderboard: leaderboard,
+        lastScoreUpdate: lastScoreUpdate?.toISOString(),
+        savedAt: new Date().toISOString()
+      };
+
+      const gistData = {
+        description: `NFL Pick'em Week ${weekNumber} - ${year}`,
+        public: false,
+        files: {
+          [`week-${weekNumber}-${year}.json`]: {
+            content: JSON.stringify(weekData, null, 2)
+          }
+        }
+      };
+
+      let response;
+      if (currentGistId) {
+        // Update existing gist
+        response = await fetch(`https://api.github.com/gists/${currentGistId}`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `token ${githubToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(gistData)
+        });
+      } else {
+        // Create new gist
+        response = await fetch('https://api.github.com/gists', {
+          method: 'POST',
+          headers: {
+            'Authorization': `token ${githubToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(gistData)
+        });
+      }
+
+      if (!response.ok) {
+        throw new Error(`GitHub API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      if (!currentGistId) {
+        setCurrentGistId(result.id);
+      }
+
+      setUploadMessage('✓ Week saved to cloud successfully!');
+      setTimeout(() => setUploadMessage(''), 3000);
+    } catch (error) {
+      console.error('Error saving to gist:', error);
+      setUploadMessage(`❌ Error saving to cloud: ${error.message}`);
+      setTimeout(() => setUploadMessage(''), 5000);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const loadWeekFromGist = async (gistId) => {
+    if (!githubToken) {
+      setUploadMessage('⚠️ GitHub token required for loading from cloud');
+      setTimeout(() => setUploadMessage(''), 3000);
+      return;
+    }
+
+    try {
+      const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+        headers: {
+          'Authorization': `token ${githubToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`GitHub API error: ${response.status}`);
+      }
+
+      const gist = await response.json();
+      const fileName = Object.keys(gist.files)[0];
+      const content = gist.files[fileName].content;
+      const weekData = JSON.parse(content);
+
+      // Load the data
+      setGames(weekData.games || []);
+      setPlayers(weekData.players || []);
+      setWeekNumber(weekData.weekNumber || '1');
+      setYear(weekData.year || '2025');
+      setSeasonType(weekData.seasonType || '2');
+      if (weekData.lastScoreUpdate) {
+        setLastScoreUpdate(new Date(weekData.lastScoreUpdate));
+      }
+      setCurrentGistId(gistId);
+      setIsAdminMode(false);
+
+      setUploadMessage('✓ Week loaded from cloud successfully!');
+      setTimeout(() => setUploadMessage(''), 3000);
+    } catch (error) {
+      console.error('Error loading from gist:', error);
+      setUploadMessage(`❌ Error loading from cloud: ${error.message}`);
+      setTimeout(() => setUploadMessage(''), 5000);
+    }
+  };
+
+  const loadWeekHistory = async () => {
+    if (!githubToken) return;
+
+    try {
+      const response = await fetch('https://api.github.com/gists', {
+        headers: {
+          'Authorization': `token ${githubToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) return;
+
+      const gists = await response.json();
+      const pickemGists = gists
+        .filter(gist => gist.description?.includes('NFL Pick\'em Week'))
+        .map(gist => ({
+          id: gist.id,
+          description: gist.description,
+          createdAt: gist.created_at,
+          updatedAt: gist.updated_at
+        }))
+        .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+      setWeekHistory(pickemGists);
+    } catch (error) {
+      console.error('Error loading week history:', error);
+    }
+  };
+
+  // Load week history when GitHub token is available
+  React.useEffect(() => {
+    if (githubToken && !isLoading) {
+      loadWeekHistory();
+    }
+  }, [githubToken, isLoading]);
 
   const exportData = () => {
     const data = {
@@ -734,7 +920,7 @@ const App = () => {
                     </select>
                   </div>
                 </div>
-                <div>
+                <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     ESPN API URL
                   </label>
@@ -745,6 +931,22 @@ const App = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    GitHub Personal Access Token (for cloud persistence)
+                  </label>
+                  <input
+                    type="password"
+                    value={githubToken}
+                    onChange={(e) => setGithubToken(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Create at: GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token. 
+                    Needs 'gist' scope for saving weekly data.
+                  </p>
                 </div>
               </div>
 
@@ -758,12 +960,57 @@ const App = () => {
                 </div>
               )}
 
+              {githubToken && weekHistory.length > 0 && (
+                <div className="border-2 border-dashed border-blue-300 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-700 mb-4">
+                    Previous Weeks (Cloud Storage)
+                  </h3>
+                  <div className="max-h-48 overflow-y-auto space-y-2">
+                    {weekHistory.map(week => (
+                      <div key={week.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                          <div className="font-medium text-gray-800">{week.description}</div>
+                          <div className="text-sm text-gray-500">
+                            Updated: {new Date(week.updatedAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => loadWeekFromGist(week.id)}
+                          className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm"
+                        >
+                          Load
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {games.length > 0 && (
                 <div className="border-t pt-4">
                   <h3 className="text-lg font-semibold text-gray-700 mb-2">
                     Data Management
                   </h3>
                   <div className="flex gap-3 flex-wrap">
+                    {githubToken && (
+                      <button
+                        onClick={saveWeekToGist}
+                        disabled={isSaving}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        {isSaving ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            Saving to Cloud...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4" />
+                            Save to Cloud
+                          </>
+                        )}
+                      </button>
+                    )}
                     <button
                       onClick={exportData}
                       className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
@@ -778,6 +1025,7 @@ const App = () => {
                           setGames([]);
                           setPlayers([]);
                           setActivePlayer(null);
+                          setCurrentGistId(null);
                           setUploadMessage('âœ" All data cleared');
                           setTimeout(() => setUploadMessage(''), 3000);
                         }
@@ -825,6 +1073,25 @@ const App = () => {
                   </>
                 )}
               </button>
+              {githubToken && (
+                <button
+                  onClick={saveWeekToGist}
+                  disabled={isSaving}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isSaving ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      Save to Cloud
+                    </>
+                  )}
+                </button>
+              )}
               <button
                 onClick={() => setShowAdmin(!showAdmin)}
                 className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
