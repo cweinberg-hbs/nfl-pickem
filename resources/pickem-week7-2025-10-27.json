@@ -1,0 +1,186 @@
+{
+  "games": [
+    {
+      "id": 1,
+      "awayTeam": "Pittsburgh",
+      "homeTeam": "Cincinnati",
+      "day": "Sunday",
+      "time": "8:15 pm",
+      "winner": "Cincinnati",
+      "homeScore": 33,
+      "awayScore": 31,
+      "status": "final"
+    },
+    {
+      "id": 2,
+      "awayTeam": "LA Rams",
+      "homeTeam": "Jacksonville",
+      "day": "Sunday",
+      "time": "9:30 am",
+      "winner": "LA Rams",
+      "homeScore": 7,
+      "awayScore": 35,
+      "status": "final"
+    },
+    {
+      "id": 3,
+      "awayTeam": "New Orleans",
+      "homeTeam": "Chicago",
+      "day": "Sunday",
+      "time": "1:00 pm",
+      "winner": "Chicago",
+      "homeScore": 26,
+      "awayScore": 14,
+      "status": "final"
+    },
+    {
+      "id": 4,
+      "awayTeam": "Miami",
+      "homeTeam": "Cleveland",
+      "day": "Sunday",
+      "time": "1:00 pm",
+      "winner": "Cleveland",
+      "homeScore": 31,
+      "awayScore": 6,
+      "status": "final"
+    },
+    {
+      "id": 5,
+      "awayTeam": "New England",
+      "homeTeam": "Tennessee",
+      "day": "Sunday",
+      "time": "1:00 pm",
+      "winner": "New England",
+      "homeScore": 13,
+      "awayScore": 31,
+      "status": "final"
+    },
+    {
+      "id": 6,
+      "awayTeam": "Las Vegas",
+      "homeTeam": "Kansas City",
+      "day": "Sunday",
+      "time": "1:00 pm",
+      "winner": "Kansas City",
+      "homeScore": 31,
+      "awayScore": 0,
+      "status": "final"
+    },
+    {
+      "id": 7,
+      "awayTeam": "Philadelphia",
+      "homeTeam": "Minnesota",
+      "day": "Sunday",
+      "time": "1:00 pm",
+      "winner": "Philadelphia",
+      "homeScore": 22,
+      "awayScore": 28,
+      "status": "final"
+    },
+    {
+      "id": 8,
+      "awayTeam": "Carolina",
+      "homeTeam": "NY Jets",
+      "day": "Sunday",
+      "time": "1:00 pm",
+      "winner": "Carolina",
+      "homeScore": 6,
+      "awayScore": 13,
+      "status": "final"
+    },
+    {
+      "id": 9,
+      "awayTeam": "NY Giants",
+      "homeTeam": "Denver",
+      "day": "Sunday",
+      "time": "4:05 pm",
+      "winner": "Denver",
+      "homeScore": 33,
+      "awayScore": 32,
+      "status": "final"
+    },
+    {
+      "id": 10,
+      "awayTeam": "Indianapolis",
+      "homeTeam": "LA Chargers",
+      "day": "Sunday",
+      "time": "4:05 pm",
+      "winner": "Indianapolis",
+      "homeScore": 24,
+      "awayScore": 38,
+      "status": "final"
+    },
+    {
+      "id": 11,
+      "awayTeam": "Washington",
+      "homeTeam": "Dallas",
+      "day": "Sunday",
+      "time": "4:25 pm",
+      "winner": "Dallas",
+      "homeScore": 44,
+      "awayScore": 22,
+      "status": "final"
+    },
+    {
+      "id": 12,
+      "awayTeam": "Green Bay",
+      "homeTeam": "Arizona",
+      "day": "Sunday",
+      "time": "4:25 pm",
+      "winner": "Green Bay",
+      "homeScore": 23,
+      "awayScore": 27,
+      "status": "final"
+    },
+    {
+      "id": 13,
+      "awayTeam": "Atlanta",
+      "homeTeam": "San Francisco",
+      "day": "Sunday",
+      "time": "8:20 pm",
+      "winner": "San Francisco",
+      "homeScore": 20,
+      "awayScore": 10,
+      "status": "final"
+    },
+    {
+      "id": 14,
+      "awayTeam": "Tampa Bay",
+      "homeTeam": "Detroit",
+      "day": "Monday",
+      "time": "7:00 pm",
+      "winner": "Detroit",
+      "homeScore": 24,
+      "awayScore": 9,
+      "status": "final"
+    },
+    {
+      "id": 15,
+      "awayTeam": "Houston",
+      "homeTeam": "Seattle",
+      "day": "Monday",
+      "time": "10:00 pm",
+      "winner": "Seattle",
+      "homeScore": 27,
+      "awayScore": 19,
+      "status": "final"
+    }
+  ],
+  "players": [
+    {
+      "id": 1,
+      "name": "Player 1",
+      "picks": {
+        "1": "Minnesota"
+      },
+      "tiebreaker": 0
+    }
+  ],
+  "activePlayer": 1,
+  "weekNumber": "7",
+  "year": "2025",
+  "seasonType": "2",
+  "espnApiUrl": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard",
+  "lastScoreUpdate": "2025-10-25T12:45:53.057Z",
+  "exportDate": "2025-10-27T11:38:02.245Z"
+}
