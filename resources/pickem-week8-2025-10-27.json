@@ -1,0 +1,236 @@
+{
+  "games": [
+    {
+      "id": 1,
+      "awayTeam": "Minnesota",
+      "homeTeam": "LA Chargers",
+      "day": "Thursday",
+      "time": "8:15 pm",
+      "winner": "LA Chargers",
+      "homeScore": 37,
+      "awayScore": 10,
+      "status": "final"
+    },
+    {
+      "id": 2,
+      "awayTeam": "Miami",
+      "homeTeam": "Atlanta",
+      "day": "Sunday",
+      "time": "1:00 pm",
+      "winner": "Miami",
+      "homeScore": 10,
+      "awayScore": 34,
+      "status": "final"
+    },
+    {
+      "id": 3,
+      "awayTeam": "NY Jets",
+      "homeTeam": "Cincinnati",
+      "day": "Sunday",
+      "time": "1:00 pm",
+      "winner": "NY Jets",
+      "homeScore": 38,
+      "awayScore": 39,
+      "status": "final"
+    },
+    {
+      "id": 4,
+      "awayTeam": "Cleveland",
+      "homeTeam": "New England",
+      "day": "Sunday",
+      "time": "1:00 pm",
+      "winner": "New England",
+      "homeScore": 32,
+      "awayScore": 13,
+      "status": "final"
+    },
+    {
+      "id": 5,
+      "awayTeam": "NY Giants",
+      "homeTeam": "Philadelphia",
+      "day": "Sunday",
+      "time": "1:00 pm",
+      "winner": "Philadelphia",
+      "homeScore": 38,
+      "awayScore": 20,
+      "status": "final"
+    },
+    {
+      "id": 6,
+      "awayTeam": "Buffalo",
+      "homeTeam": "Carolina",
+      "day": "Sunday",
+      "time": "1:00 pm",
+      "winner": "Buffalo",
+      "homeScore": 9,
+      "awayScore": 40,
+      "status": "final"
+    },
+    {
+      "id": 7,
+      "awayTeam": "Chicago",
+      "homeTeam": "Baltimore",
+      "day": "Sunday",
+      "time": "1:00 pm",
+      "winner": "Baltimore",
+      "homeScore": 30,
+      "awayScore": 16,
+      "status": "final"
+    },
+    {
+      "id": 8,
+      "awayTeam": "San Francisco",
+      "homeTeam": "Houston",
+      "day": "Sunday",
+      "time": "1:00 pm",
+      "winner": "Houston",
+      "homeScore": 26,
+      "awayScore": 15,
+      "status": "final"
+    },
+    {
+      "id": 9,
+      "awayTeam": "Tampa Bay",
+      "homeTeam": "New Orleans",
+      "day": "Sunday",
+      "time": "4:05 pm",
+      "winner": "Tampa Bay",
+      "homeScore": 3,
+      "awayScore": 23,
+      "status": "final"
+    },
+    {
+      "id": 10,
+      "awayTeam": "Dallas",
+      "homeTeam": "Denver",
+      "day": "Sunday",
+      "time": "4:25 pm",
+      "winner": "Denver",
+      "homeScore": 44,
+      "awayScore": 24,
+      "status": "final"
+    },
+    {
+      "id": 11,
+      "awayTeam": "Tennessee",
+      "homeTeam": "Indianapolis",
+      "day": "Sunday",
+      "time": "4:25 pm",
+      "winner": "Indianapolis",
+      "homeScore": 38,
+      "awayScore": 14,
+      "status": "final"
+    },
+    {
+      "id": 12,
+      "awayTeam": "Green Bay",
+      "homeTeam": "Pittsburgh",
+      "day": "Sunday",
+      "time": "8:20 pm",
+      "winner": "Green Bay",
+      "homeScore": 25,
+      "awayScore": 35,
+      "status": "final"
+    },
+    {
+      "id": 13,
+      "awayTeam": "Washington",
+      "homeTeam": "Kansas City",
+      "day": "Monday",
+      "time": "8:15 pm",
+      "winner": null,
+      "homeScore": 0,
+      "awayScore": 0,
+      "status": "scheduled"
+    }
+  ],
+  "players": [
+    {
+      "id": 1,
+      "name": "Louie",
+      "picks": {
+        "1": "LA Chargers",
+        "2": "Atlanta",
+        "3": "Cincinnati",
+        "4": "New England",
+        "5": "Philadelphia",
+        "6": "Buffalo",
+        "7": "Baltimore",
+        "8": "San Francisco",
+        "9": "Tampa Bay",
+        "10": "Denver",
+        "11": "Indianapolis",
+        "12": "Green Bay",
+        "13": "Kansas City"
+      },
+      "tiebreaker": 0
+    },
+    {
+      "id": 2,
+      "name": "Johnny",
+      "picks": {
+        "1": "LA Chargers",
+        "2": "Atlanta",
+        "3": "Cincinnati",
+        "4": "New England",
+        "5": "Philadelphia",
+        "6": "Carolina",
+        "7": "Baltimore",
+        "8": "Houston",
+        "9": "New Orleans",
+        "10": "Denver",
+        "11": "Indianapolis",
+        "12": "Pittsburgh",
+        "13": "Kansas City"
+      },
+      "tiebreaker": 0
+    },
+    {
+      "id": 3,
+      "name": "Daniel",
+      "picks": {
+        "1": "LA Chargers",
+        "2": "Atlanta",
+        "3": "Cincinnati",
+        "4": "New England",
+        "5": "Philadelphia",
+        "6": "Buffalo",
+        "7": "Chicago",
+        "8": "Houston",
+        "9": "Tampa Bay",
+        "10": "Denver",
+        "11": "Indianapolis",
+        "12": "Pittsburgh",
+        "13": "Kansas City"
+      },
+      "tiebreaker": 0
+    },
+    {
+      "id": 4,
+      "name": "Corbett",
+      "picks": {
+        "1": "Minnesota",
+        "2": "Atlanta",
+        "3": "Cincinnati",
+        "4": "New England",
+        "5": "Philadelphia",
+        "6": "Buffalo",
+        "7": "Chicago",
+        "8": "Houston",
+        "9": "Tampa Bay",
+        "10": "Denver",
+        "11": "Indianapolis",
+        "12": "Pittsburgh",
+        "13": "Washington"
+      },
+      "tiebreaker": 39
+    }
+  ],
+  "activePlayer": 1,
+  "weekNumber": "8",
+  "year": "2025",
+  "seasonType": "2",
+  "espnApiUrl": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard",
+  "lastScoreUpdate": "2025-10-27T11:31:45.308Z",
+  "exportDate": "2025-10-27T11:41:51.575Z"
+}
