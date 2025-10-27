@@ -13,12 +13,14 @@ const App = () => {
   const [year, setYear] = useState('2025');
   const [seasonType, setSeasonType] = useState('2');
   const [espnApiUrl, setEspnApiUrl] = useState('https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard');
-  const [githubToken, setGithubToken] = useState('');
   const [currentGistId, setCurrentGistId] = useState(null);
   const [isAdminMode, setIsAdminMode] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [weekHistory, setWeekHistory] = useState([]);
+  
+  // Get GitHub token from environment variable (secure)
+  const githubToken = import.meta.env.VITE_GITHUB_TOKEN;
 
   // Load data from session storage on mount
   React.useEffect(() => {
@@ -67,12 +69,6 @@ const App = () => {
       saveToStorage('pickem-espn-api-url', espnApiUrl);
     }
   }, [espnApiUrl, isLoading]);
-
-  React.useEffect(() => {
-    if (!isLoading) {
-      saveToStorage('pickem-github-token', githubToken);
-    }
-  }, [githubToken, isLoading]);
 
   React.useEffect(() => {
     if (!isLoading && currentGistId) {
@@ -130,12 +126,6 @@ const App = () => {
       const savedEspnUrl = sessionStorage.getItem('pickem-espn-api-url');
       if (savedEspnUrl) {
         setEspnApiUrl(savedEspnUrl);
-      }
-
-      // Load GitHub token
-      const savedToken = sessionStorage.getItem('pickem-github-token');
-      if (savedToken) {
-        setGithubToken(savedToken);
       }
 
       // Load current gist ID
@@ -201,7 +191,6 @@ const App = () => {
       'pickem-year', 
       'pickem-season-type',
       'pickem-espn-api-url',
-      'pickem-github-token',
       'pickem-gist-id',
       'pickem-last-update'
     ];
@@ -357,12 +346,12 @@ const App = () => {
     }
   };
 
-  // Load week history when GitHub token is available
+  // Load week history when component mounts (if token is available)
   React.useEffect(() => {
     if (githubToken && !isLoading) {
       loadWeekHistory();
     }
-  }, [githubToken, isLoading]);
+  }, [isLoading]);
 
   const exportData = () => {
     const data = {
@@ -932,22 +921,13 @@ const App = () => {
                     placeholder="https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    GitHub Personal Access Token (for cloud persistence)
-                  </label>
-                  <input
-                    type="password"
-                    value={githubToken}
-                    onChange={(e) => setGithubToken(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Create at: GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token. 
-                    Needs 'gist' scope for saving weekly data.
-                  </p>
-                </div>
+                {githubToken && (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm text-green-700">
+                      ✓ Cloud persistence enabled via environment configuration
+                    </p>
+                  </div>
+                )}
               </div>
 
               {uploadMessage && (
@@ -1020,7 +1000,7 @@ const App = () => {
                     </button>
                     <button
                       onClick={() => {
-                        if (confirm('This will clear all data for this week. Continue?')) {
+                        if (confirm('This will clear all data stored locally in your browser for this week. Continue?')) {
                           clearAllData();
                           setGames([]);
                           setPlayers([]);
@@ -1032,7 +1012,7 @@ const App = () => {
                       }}
                       className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                     >
-                      Clear All Data
+                      Clear All Local Data
                     </button>
                   </div>
                 </div>
