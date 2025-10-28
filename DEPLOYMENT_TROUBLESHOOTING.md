@@ -65,7 +65,8 @@ https://cweinberg-hbs.github.io/nfl-pickem/
 ```bash
 npm run build
 ls -la dist/
-cat dist/index.html  # Should show /nfl-pickem/ paths
+# Should show: index.html, 404.html, assets/
+cat dist/index.html  # Should show /nfl-pickem/ paths and SPA script
 ```
 
 ### 2. **GitHub Actions Logs**
@@ -89,6 +90,7 @@ If page loads but shows errors:
 ### **404 Error**
 - ✅ **Fixed**: Updated `vite.config.js` with correct base path
 - ✅ **Fixed**: Workflow deploys `dist/` directory correctly
+- ✅ **Fixed**: Added SPA routing support with `404.html` redirect system
 
 ### **Blank Page**
 - Check browser console for JavaScript errors
