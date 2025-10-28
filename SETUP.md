@@ -32,12 +32,18 @@ The app has been updated to use environment variables instead of exposing the Gi
 
 2. **Enable GitHub Pages**:
    - Go to repository Settings → Pages
-   - Source: "GitHub Actions"
+   - Source: **"GitHub Actions"** (not "Deploy from a branch")
 
 3. **Deploy**:
    - Push to main branch
    - GitHub Actions will automatically build and deploy
-   - Token will be securely embedded during build process
+   - App will be available at: `https://cweinberg-hbs.github.io/nfl-pickem/`
+
+## ✅ **Deployment Issues Fixed**
+
+- **Vite Configuration**: Added `base: '/nfl-pickem/'` for GitHub Pages subdirectory
+- **Workflow Optimization**: Simplified deployment process
+- **Build Verification**: Confirmed assets reference correct paths
 
 ## Security Benefits
 
