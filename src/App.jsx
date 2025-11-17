@@ -18,6 +18,7 @@ const App = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [weekHistory, setWeekHistory] = useState([]);
+  const [teamStandings, setTeamStandings] = useState({});
   
   // Get GitHub token from environment variable (secure)
   const githubToken = import.meta.env.VITE_GITHUB_TOKEN;
@@ -82,6 +83,12 @@ const App = () => {
     }
   }, [lastScoreUpdate, isLoading]);
 
+  React.useEffect(() => {
+    if (!isLoading && Object.keys(teamStandings).length > 0) {
+      saveToStorage('pickem-team-standings', teamStandings);
+    }
+  }, [teamStandings, isLoading]);
+
   const loadFromStorage = () => {
     try {
       // Load games
@@ -140,6 +147,12 @@ const App = () => {
         setLastScoreUpdate(new Date(savedLastUpdate));
       }
 
+      // Load team standings
+      const savedStandings = sessionStorage.getItem('pickem-team-standings');
+      if (savedStandings) {
+        setTeamStandings(JSON.parse(savedStandings));
+      }
+
     } catch (error) {
       console.log('No previous data found or error loading:', error);
     } finally {
@@ -192,7 +205,8 @@ const App = () => {
       'pickem-season-type',
       'pickem-espn-api-url',
       'pickem-gist-id',
-      'pickem-last-update'
+      'pickem-last-update',
+      'pickem-team-standings'
     ];
     keys.forEach(key => sessionStorage.removeItem(key));
   };
@@ -612,8 +626,27 @@ const App = () => {
       
       console.log('updatedGames: ' + JSON.stringify(updatedGames));
       setGames(updatedGames);
+      
+      // Extract team standings from game data
+      const standings = {};
+      data.events?.forEach(event => {
+        event.competitions[0].competitors.forEach(competitor => {
+          const teamName = normalizeTeamName(competitor.team.displayName);
+          const record = competitor.records?.find(r => r.type === 'total');
+          if (teamName && record && record.summary) {
+            // Record summary is in format "9-1-0" or "9-1"
+            const [wins, losses] = record.summary.split('-').map(n => parseInt(n) || 0);
+            standings[teamName] = { wins, losses };
+          }
+        });
+      });
+      
+      if (Object.keys(standings).length > 0) {
+        setTeamStandings(standings);
+      }
+      
       setLastScoreUpdate(new Date());
-      setUploadMessage('Scores updated from ESPN!');
+      setUploadMessage('Scores and standings updated from ESPN!');
       setTimeout(() => setUploadMessage(''), 3000);
     } catch (error) {
       console.error('Error fetching scores:', error);
@@ -795,6 +828,15 @@ const App = () => {
   }, [players, games]);
 
   const currentPlayer = players.find(p => p.id === activePlayer);
+
+  const getTeamRecord = (teamName) => {
+    const normalizedName = teamName;
+    const record = teamStandings[normalizedName];
+    if (record) {
+      return ` (${record.wins}-${record.losses})`;
+    }
+    return '';
+  };
 
   const getGameStatus = (game, pick) => {
     if (game.winner === null) {
@@ -1197,7 +1239,10 @@ const App = () => {
                                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                 } ${game.winner !== null ? 'opacity-60 cursor-not-allowed' : ''}`}
                               >
-                                {game.awayTeam}
+                                <div className="text-center">
+                                  <div>{game.awayTeam}</div>
+                                  <div className="text-xs opacity-75">{getTeamRecord(game.awayTeam)}</div>
+                                </div>
                                 {game.winner === game.awayTeam && ' ✓'}
                               </button>
                               <button
@@ -1209,7 +1254,10 @@ const App = () => {
                                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                 } ${game.winner !== null ? 'opacity-60 cursor-not-allowed' : ''}`}
                               >
-                                {game.homeTeam}
+                                <div className="text-center">
+                                  <div>{game.homeTeam}</div>
+                                  <div className="text-xs opacity-75">{getTeamRecord(game.homeTeam)}</div>
+                                </div>
                                 {game.winner === game.homeTeam && ' ✓'}
                               </button>
                             </div>
