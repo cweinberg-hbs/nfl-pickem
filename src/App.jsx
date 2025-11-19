@@ -23,6 +23,28 @@ const App = () => {
   // Get GitHub token from environment variable (secure)
   const githubToken = import.meta.env.VITE_GITHUB_TOKEN;
 
+  // Calculate current NFL week (Tuesday-Monday cycle)
+  const getCurrentNFLWeek = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    
+    // NFL season typically starts first Thursday in September
+    // Week 1 starts on the Tuesday before that Thursday
+    const seasonStart = new Date(year, 8, 1); // September 1st
+    const firstThursday = new Date(seasonStart);
+    firstThursday.setDate(1 + ((4 - seasonStart.getDay() + 7) % 7)); // First Thursday
+    const week1Start = new Date(firstThursday);
+    week1Start.setDate(firstThursday.getDate() - 2); // Tuesday before
+    
+    // Calculate weeks elapsed
+    const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+    const weeksSinceStart = Math.floor((now - week1Start) / msPerWeek);
+    
+    // NFL regular season is weeks 1-18
+    const currentWeek = Math.max(1, Math.min(18, weeksSinceStart + 1));
+    return currentWeek.toString();
+  };
+
   // Load data from session storage on mount
   React.useEffect(() => {
     loadFromStorage();
@@ -366,6 +388,174 @@ const App = () => {
       loadWeekHistory();
     }
   }, [isLoading]);
+
+  // Auto-load current week's games if no games exist
+  React.useEffect(() => {
+    if (!isLoading && games.length === 0) {
+      loadCurrentWeekGames();
+    }
+  }, [isLoading]);
+
+  const loadCurrentWeekGames = async () => {
+    try {
+      const currentWeek = getCurrentNFLWeek();
+      setWeekNumber(currentWeek);
+      
+      const apiUrl = `${espnApiUrl}?dates=${year}&seasontype=${seasonType}&week=${currentWeek}`;
+      const response = await fetch(apiUrl);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch games from ESPN');
+      }
+
+      const data = await response.json();
+      
+      if (!data.events || data.events.length === 0) {
+        setUploadMessage('⚠️ No games found for current week. Please upload a pick sheet or check the week/season settings.');
+        setTimeout(() => setUploadMessage(''), 5000);
+        return;
+      }
+
+      // Create team name normalization function
+      const normalizeTeamName = (teamName) => {
+        const teamMap = {
+          'Steelers': 'Pittsburgh',
+          'Pittsburgh Steelers': 'Pittsburgh',
+          'Bengals': 'Cincinnati', 
+          'Cincinnati Bengals': 'Cincinnati',
+          'Rams': 'LA Rams',
+          'Los Angeles Rams': 'LA Rams',
+          'Jaguars': 'Jacksonville',
+          'Jacksonville Jaguars': 'Jacksonville',
+          'Saints': 'New Orleans',
+          'New Orleans Saints': 'New Orleans',
+          'Bears': 'Chicago',
+          'Chicago Bears': 'Chicago',
+          'Dolphins': 'Miami',
+          'Miami Dolphins': 'Miami',
+          'Browns': 'Cleveland',
+          'Cleveland Browns': 'Cleveland',
+          'Patriots': 'New England',
+          'New England Patriots': 'New England',
+          'Titans': 'Tennessee',
+          'Tennessee Titans': 'Tennessee',
+          'Raiders': 'Las Vegas',
+          'Las Vegas Raiders': 'Las Vegas',
+          'Chiefs': 'Kansas City',
+          'Kansas City Chiefs': 'Kansas City',
+          'Eagles': 'Philadelphia',
+          'Philadelphia Eagles': 'Philadelphia',
+          'Vikings': 'Minnesota',
+          'Minnesota Vikings': 'Minnesota',
+          'Panthers': 'Carolina',
+          'Carolina Panthers': 'Carolina',
+          'Jets': 'NY Jets',
+          'New York Jets': 'NY Jets',
+          'Giants': 'NY Giants',
+          'New York Giants': 'NY Giants',
+          'Broncos': 'Denver',
+          'Denver Broncos': 'Denver',
+          'Colts': 'Indianapolis',
+          'Indianapolis Colts': 'Indianapolis',
+          'Chargers': 'LA Chargers',
+          'Los Angeles Chargers': 'LA Chargers',
+          'Commanders': 'Washington',
+          'Washington Commanders': 'Washington',
+          'Cowboys': 'Dallas',
+          'Dallas Cowboys': 'Dallas',
+          'Packers': 'Green Bay',
+          'Green Bay Packers': 'Green Bay',
+          'Cardinals': 'Arizona',
+          'Arizona Cardinals': 'Arizona',
+          'Falcons': 'Atlanta',
+          'Atlanta Falcons': 'Atlanta',
+          '49ers': 'San Francisco',
+          'San Francisco 49ers': 'San Francisco',
+          'Buccaneers': 'Tampa Bay',
+          'Tampa Bay Buccaneers': 'Tampa Bay',
+          'Lions': 'Detroit',
+          'Detroit Lions': 'Detroit',
+          'Texans': 'Houston',
+          'Houston Texans': 'Houston',
+          'Seahawks': 'Seattle',
+          'Seattle Seahawks': 'Seattle',
+          'Ravens': 'Baltimore',
+          'Baltimore Ravens': 'Baltimore',
+          'Bills': 'Buffalo',
+          'Buffalo Bills': 'Buffalo'
+        };
+        return teamMap[teamName] || teamName;
+      };
+
+      // Convert ESPN events to our game format
+      const parsedGames = data.events.map((event, index) => {
+        const competition = event.competitions[0];
+        const homeTeam = competition.competitors.find(c => c.homeAway === 'home');
+        const awayTeam = competition.competitors.find(c => c.homeAway === 'away');
+        
+        const gameDate = new Date(event.date);
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const day = dayNames[gameDate.getDay()];
+        
+        const time = gameDate.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+
+        const homeScore = parseInt(homeTeam.score) || 0;
+        const awayScore = parseInt(awayTeam.score) || 0;
+        const status = competition.status.type.name;
+        
+        let winner = null;
+        let gameStatus = 'scheduled';
+        
+        if (status === 'STATUS_FINAL') {
+          winner = homeScore > awayScore ? normalizeTeamName(homeTeam.team.displayName) : normalizeTeamName(awayTeam.team.displayName);
+          gameStatus = 'final';
+        } else if (status === 'STATUS_IN_PROGRESS') {
+          winner = homeScore > awayScore ? normalizeTeamName(homeTeam.team.displayName) : (awayScore > homeScore ? normalizeTeamName(awayTeam.team.displayName) : null);
+          gameStatus = 'in-progress';
+        }
+
+        return {
+          id: index + 1,
+          awayTeam: normalizeTeamName(awayTeam.team.displayName),
+          homeTeam: normalizeTeamName(homeTeam.team.displayName),
+          day,
+          time,
+          winner,
+          homeScore: gameStatus !== 'scheduled' ? homeScore : undefined,
+          awayScore: gameStatus !== 'scheduled' ? awayScore : undefined,
+          status: gameStatus
+        };
+      });
+
+      // Extract team standings from game data
+      const standings = {};
+      data.events.forEach(event => {
+        event.competitions[0].competitors.forEach(competitor => {
+          const teamName = normalizeTeamName(competitor.team.displayName);
+          const record = competitor.records?.find(r => r.type === 'total');
+          if (teamName && record && record.summary) {
+            const [wins, losses] = record.summary.split('-').map(n => parseInt(n) || 0);
+            standings[teamName] = { wins, losses };
+          }
+        });
+      });
+
+      setGames(parsedGames);
+      setTeamStandings(standings);
+      setIsAdminMode(false);
+      setUploadMessage(`✓ Loaded ${parsedGames.length} games for Week ${currentWeek} from ESPN`);
+      setTimeout(() => setUploadMessage(''), 4000);
+      
+    } catch (error) {
+      console.error('Error loading current week games:', error);
+      setUploadMessage(`⚠️ Could not load current week games from ESPN: ${error.message}. Please upload a pick sheet manually.`);
+      setTimeout(() => setUploadMessage(''), 6000);
+    }
+  };
 
   const exportData = () => {
     const data = {
@@ -859,23 +1049,34 @@ const App = () => {
 
             <div className="space-y-6">
               <div>
-                <h2 className="text-xl font-semibold text-gray-700 mb-2">Admin Instructions:</h2>
+                <h2 className="text-xl font-semibold text-gray-700 mb-2">How It Works:</h2>
                 <ol className="list-decimal list-inside space-y-2 text-gray-600">
-                  <li>Upload the weekly pick sheet to set up games</li>
-                  <li>Or restore a previous week from exported data</li>
+                  <li>Games automatically load from ESPN for the current NFL week</li>
                   <li>Add players and have them make picks through the web interface</li>
-                  <li>Update scores automatically from ESPN or manually</li>
-                  <li>Track scores and leaderboard in real-time</li>
+                  <li>Scores update automatically from ESPN with live standings</li>
+                  <li>Track progress and leaderboard in real-time</li>
+                  <li>Manually upload pick sheets or import data if needed</li>
                 </ol>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingUp className="w-5 h-5 text-blue-600" />
+                  <h3 className="font-semibold text-blue-800">Current Week Auto-Loading</h3>
+                </div>
+                <p className="text-sm text-blue-700">
+                  The app automatically detects and loads the current NFL week (Tuesday-Monday cycle) from ESPN's API. 
+                  No manual setup required for current games!
+                </p>
               </div>
 
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
                 <Upload className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-gray-700 mb-2">
-                  Upload Pick Sheet
+                  Manual Upload (Optional)
                 </h3>
                 <p className="text-gray-600 mb-4">
-                  Upload the blank weekly pick sheet to set up games
+                  Override auto-loading by uploading a custom pick sheet
                 </p>
                 <label className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer">
                   <Upload className="w-5 h-5 inline mr-2" />
@@ -1007,6 +1208,22 @@ const App = () => {
                   </div>
                 </div>
               )}
+
+              <div className="border-2 border-dashed border-green-300 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-700 mb-4">
+                  Load Current Week
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Manually reload the current NFL week's games from ESPN
+                </p>
+                <button
+                  onClick={loadCurrentWeekGames}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  Load Current Week Games
+                </button>
+              </div>
 
               {games.length > 0 && (
                 <div className="border-t pt-4">
