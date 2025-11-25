@@ -249,6 +249,7 @@ const App = () => {
         seasonType,
         games,
         players,
+        teamStandings,
         leaderboard: leaderboard,
         lastScoreUpdate: lastScoreUpdate?.toISOString(),
         savedAt: new Date().toISOString()
@@ -265,9 +266,13 @@ const App = () => {
       };
 
       let response;
-      if (currentGistId) {
-        // Update existing gist
-        response = await fetch(`https://api.github.com/gists/${currentGistId}`, {
+      
+      // Find existing gist for this specific week/year combination
+      const existingGist = await findGistForWeek(weekNumber, year);
+      
+      if (existingGist) {
+        // Update existing gist for this week
+        response = await fetch(`https://api.github.com/gists/${existingGist.id}`, {
           method: 'PATCH',
           headers: {
             'Authorization': `token ${githubToken}`,
@@ -275,8 +280,9 @@ const App = () => {
           },
           body: JSON.stringify(gistData)
         });
+        setCurrentGistId(existingGist.id);
       } else {
-        // Create new gist
+        // Create new gist for this week
         response = await fetch('https://api.github.com/gists', {
           method: 'POST',
           headers: {
@@ -292,9 +298,7 @@ const App = () => {
       }
 
       const result = await response.json();
-      if (!currentGistId) {
-        setCurrentGistId(result.id);
-      }
+      setCurrentGistId(result.id);
 
       setUploadMessage('✓ Week saved to cloud successfully!');
       setTimeout(() => setUploadMessage(''), 3000);
@@ -307,7 +311,28 @@ const App = () => {
     }
   };
 
-  const loadWeekFromGist = async (gistId) => {
+  const findGistForWeek = async (weekNum, yearNum) => {
+    try {
+      const response = await fetch('https://api.github.com/gists', {
+        headers: {
+          'Authorization': `token ${githubToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) return null;
+      
+      const gists = await response.json();
+      return gists.find(gist => 
+        gist.description?.includes(`NFL Pick'em Week ${weekNum} - ${yearNum}`)
+      );
+    } catch (error) {
+      console.error('Error finding gist for week:', error);
+      return null;
+    }
+  };
+
+  const loadWeekFromGist = async (gistId, showMessage = true) => {
     if (!githubToken) {
       setUploadMessage('⚠️ GitHub token required for loading from cloud');
       setTimeout(() => setUploadMessage(''), 3000);
@@ -340,11 +365,16 @@ const App = () => {
       if (weekData.lastScoreUpdate) {
         setLastScoreUpdate(new Date(weekData.lastScoreUpdate));
       }
+      if (weekData.teamStandings) {
+        setTeamStandings(weekData.teamStandings);
+      }
       setCurrentGistId(gistId);
       setIsAdminMode(false);
 
-      setUploadMessage('✓ Week loaded from cloud successfully!');
-      setTimeout(() => setUploadMessage(''), 3000);
+      if (showMessage) {
+        setUploadMessage('✓ Week loaded from cloud successfully!');
+        setTimeout(() => setUploadMessage(''), 3000);
+      }
     } catch (error) {
       console.error('Error loading from gist:', error);
       setUploadMessage(`❌ Error loading from cloud: ${error.message}`);
@@ -389,12 +419,117 @@ const App = () => {
     }
   }, [isLoading]);
 
-  // Auto-load current week's games if no games exist
+  // Smart loading: prioritize cloud storage, handle new week logic
   React.useEffect(() => {
-    if (!isLoading && games.length === 0) {
+    if (!isLoading && games.length === 0 && githubToken) {
+      smartLoadWeek();
+    } else if (!isLoading && games.length === 0 && !githubToken) {
       loadCurrentWeekGames();
     }
-  }, [isLoading]);
+  }, [isLoading, githubToken]);
+
+  const smartLoadWeek = async () => {
+    try {
+      // First, load week history to see what we have
+      const response = await fetch('https://api.github.com/gists', {
+        headers: {
+          'Authorization': `token ${githubToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch gists');
+      }
+
+      const gists = await response.json();
+      const pickemGists = gists
+        .filter(gist => gist.description?.includes('NFL Pick\'em Week'))
+        .map(gist => {
+          const weekMatch = gist.description.match(/Week (\d+)/);
+          const yearMatch = gist.description.match(/- (\d{4})/);
+          return {
+            id: gist.id,
+            description: gist.description,
+            weekNumber: weekMatch ? weekMatch[1] : '0',
+            year: yearMatch ? yearMatch[1] : '2025',
+            updatedAt: gist.updated_at
+          };
+        })
+        .sort((a, b) => {
+          // Sort by year first, then week number
+          if (a.year !== b.year) return parseInt(b.year) - parseInt(a.year);
+          return parseInt(b.weekNumber) - parseInt(a.weekNumber);
+        });
+
+      setWeekHistory(pickemGists);
+      
+      const currentWeek = getCurrentNFLWeek();
+      const currentYear = new Date().getFullYear().toString();
+      
+      // Check if current week exists in cloud
+      const existingWeek = pickemGists.find(
+        gist => gist.weekNumber === currentWeek && gist.year === currentYear
+      );
+      
+      if (existingWeek) {
+        // Load existing current week
+        await loadWeekFromGist(existingWeek.id, false);
+        setUploadMessage(`✓ Loaded current week ${currentWeek} from cloud`);
+        setTimeout(() => setUploadMessage(''), 4000);
+      } else {
+        // Check if we should create new week or load latest
+        const latestWeek = pickemGists[0];
+        const shouldCreateNewWeek = shouldCreateNewWeekLogic(latestWeek, currentWeek, currentYear);
+        
+        if (shouldCreateNewWeek) {
+          // Load current week from ESPN and prepare for new save
+          setUploadMessage('Creating new week from ESPN...');
+          setTimeout(() => setUploadMessage(''), 2000);
+          await loadCurrentWeekGames();
+          setCurrentGistId(null); // Ensure new gist is created
+        } else if (latestWeek) {
+          // Load latest existing week
+          await loadWeekFromGist(latestWeek.id, false);
+          setUploadMessage(`✓ Loaded latest week from cloud: Week ${latestWeek.weekNumber}`);
+          setTimeout(() => setUploadMessage(''), 4000);
+        } else {
+          // No cloud data at all
+          setUploadMessage('No weeks found in cloud. Loading current week from ESPN...');
+          setTimeout(() => setUploadMessage(''), 3000);
+          await loadCurrentWeekGames();
+          setCurrentGistId(null);
+        }
+      }
+    } catch (error) {
+      console.error('Error in smart load:', error);
+      setUploadMessage('⚠️ Could not access cloud storage. Loading current week from ESPN...');
+      setTimeout(() => setUploadMessage(''), 4000);
+      await loadCurrentWeekGames();
+      setCurrentGistId(null);
+    }
+  };
+
+  const shouldCreateNewWeekLogic = (latestWeek, currentWeek, currentYear) => {
+    if (!latestWeek) return true;
+    
+    const latestWeekNum = parseInt(latestWeek.weekNumber);
+    const currentWeekNum = parseInt(currentWeek);
+    const latestYear = parseInt(latestWeek.year);
+    const currentYearNum = parseInt(currentYear);
+    
+    // New year = new week
+    if (currentYearNum > latestYear) return true;
+    
+    // Same year, later week = check if it's Tuesday or later
+    if (currentWeekNum > latestWeekNum) {
+      const now = new Date();
+      const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, 2 = Tuesday, etc.
+      return dayOfWeek >= 2; // Tuesday (2) or later
+    }
+    
+    return false;
+  };
 
   const loadCurrentWeekGames = async () => {
     try {
@@ -1051,23 +1186,94 @@ const App = () => {
               <div>
                 <h2 className="text-xl font-semibold text-gray-700 mb-2">How It Works:</h2>
                 <ol className="list-decimal list-inside space-y-2 text-gray-600">
-                  <li>Games automatically load from ESPN for the current NFL week</li>
+                  <li>App automatically loads your latest week from cloud storage</li>
+                  <li>If current NFL week doesn't exist in cloud and it's Tuesday or later, creates new week</li>
+                  <li>Falls back to ESPN API for current week if no cloud storage available</li>
                   <li>Add players and have them make picks through the web interface</li>
                   <li>Scores update automatically from ESPN with live standings</li>
-                  <li>Track progress and leaderboard in real-time</li>
-                  <li>Manually upload pick sheets or import data if needed</li>
+                  <li>Each week saves to separate cloud storage for history tracking</li>
                 </ol>
               </div>
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <TrendingUp className="w-5 h-5 text-blue-600" />
-                  <h3 className="font-semibold text-blue-800">Current Week Auto-Loading</h3>
+                  <h3 className="font-semibold text-blue-800">Smart Cloud-First Loading</h3>
                 </div>
                 <p className="text-sm text-blue-700">
-                  The app automatically detects and loads the current NFL week (Tuesday-Monday cycle) from ESPN's API. 
-                  No manual setup required for current games!
+                  The app intelligently loads your latest week from cloud storage first. New weeks are automatically 
+                  created on Tuesday when the NFL week transitions. Each week gets its own cloud backup for easy switching between weeks.
                 </p>
+              </div>
+
+              {githubToken && weekHistory.length > 0 && (
+                <div className="border-2 border-dashed border-blue-300 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-700 mb-4">
+                    Previous Weeks (Cloud Storage)
+                  </h3>
+                  <div className="max-h-48 overflow-y-auto space-y-2">
+                    {weekHistory.map(week => (
+                      <div key={week.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                          <div className="font-medium text-gray-800">{week.description}</div>
+                          <div className="text-sm text-gray-500">
+                            Updated: {new Date(week.updatedAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => loadWeekFromGist(week.id)}
+                          className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm"
+                        >
+                          Load
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="border-2 border-dashed border-green-300 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-700 mb-4">
+                  Smart Reload
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Reload using smart logic: check cloud storage first, then ESPN API
+                </p>
+                <button
+                  onClick={() => {
+                    setGames([]);
+                    setPlayers([]);
+                    setCurrentGistId(null);
+                    if (githubToken) {
+                      smartLoadWeek();
+                    } else {
+                      loadCurrentWeekGames();
+                    }
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  Smart Reload Week
+                </button>
+              </div>
+
+              <div className="border-2 border-dashed border-green-300 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-700 mb-4">
+                  Load Current Week
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Manually reload the current NFL week's games from ESPN (bypass cloud)
+                </p>
+                <button
+                  onClick={() => {
+                    setCurrentGistId(null);
+                    loadCurrentWeekGames();
+                  }}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  Force Load from ESPN
+                </button>
               </div>
 
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
@@ -1175,55 +1381,13 @@ const App = () => {
 
               {uploadMessage && (
                 <div className={`p-3 rounded-lg ${
-                  uploadMessage.includes('âœ"') ? 'bg-green-100 border border-green-400 text-green-700' :
-                  uploadMessage.includes('âŒ') || uploadMessage.includes('âš ï¸') ? 'bg-red-100 border border-red-400 text-red-700' :
+                  uploadMessage.includes('✓') ? 'bg-green-100 border border-green-400 text-green-700' :
+                  uploadMessage.includes('❌') || uploadMessage.includes('⚠️') ? 'bg-red-100 border border-red-400 text-red-700' :
                   'bg-blue-100 border border-blue-400 text-blue-700'
                 }`}>
                   {uploadMessage}
                 </div>
               )}
-
-              {githubToken && weekHistory.length > 0 && (
-                <div className="border-2 border-dashed border-blue-300 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-gray-700 mb-4">
-                    Previous Weeks (Cloud Storage)
-                  </h3>
-                  <div className="max-h-48 overflow-y-auto space-y-2">
-                    {weekHistory.map(week => (
-                      <div key={week.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div>
-                          <div className="font-medium text-gray-800">{week.description}</div>
-                          <div className="text-sm text-gray-500">
-                            Updated: {new Date(week.updatedAt).toLocaleDateString()}
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => loadWeekFromGist(week.id)}
-                          className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm"
-                        >
-                          Load
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="border-2 border-dashed border-green-300 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-700 mb-4">
-                  Load Current Week
-                </h3>
-                <p className="text-gray-600 mb-4">
-                  Manually reload the current NFL week's games from ESPN
-                </p>
-                <button
-                  onClick={loadCurrentWeekGames}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-                >
-                  <TrendingUp className="w-4 h-4" />
-                  Load Current Week Games
-                </button>
-              </div>
 
               {games.length > 0 && (
                 <div className="border-t pt-4">
@@ -1342,7 +1506,7 @@ const App = () => {
                 className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
               >
                 <Settings className="w-4 h-4" />
-                New Week
+                Load Week
               </button>
               <button
                 onClick={addPlayer}
