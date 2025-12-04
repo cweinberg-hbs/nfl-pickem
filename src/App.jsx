@@ -463,15 +463,47 @@ const App = () => {
         });
 
       setWeekHistory(pickemGists);
-      
+
       const currentWeek = getCurrentNFLWeek();
       const currentYear = new Date().getFullYear().toString();
-      
+
       // Check if current week exists in cloud
       const existingWeek = pickemGists.find(
         gist => gist.weekNumber === currentWeek && gist.year === currentYear
       );
-      
+
+      // Helper to get previous week's players (reset picks/tiebreaker)
+      async function getPreviousWeekPlayers() {
+        if (pickemGists.length === 0) return [];
+        // Find the most recent week before the current one
+        const prev = pickemGists.find(gist => {
+          if (gist.year !== currentYear) return false;
+          return parseInt(gist.weekNumber) < parseInt(currentWeek);
+        }) || pickemGists[0];
+        if (!prev) return [];
+        try {
+          const resp = await fetch(`https://api.github.com/gists/${prev.id}`, {
+            headers: {
+              'Authorization': `token ${githubToken}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          if (!resp.ok) return [];
+          const gist = await resp.json();
+          const fileName = Object.keys(gist.files)[0];
+          const content = gist.files[fileName].content;
+          const weekData = JSON.parse(content);
+          if (Array.isArray(weekData.players)) {
+            return weekData.players.map(p => ({
+              ...p,
+              picks: {},
+              tiebreaker: 0
+            }));
+          }
+        } catch (e) {}
+        return [];
+      }
+
       if (existingWeek) {
         // Load existing current week
         await loadWeekFromGist(existingWeek.id, false);
@@ -481,12 +513,13 @@ const App = () => {
         // Check if we should create new week or load latest
         const latestWeek = pickemGists[0];
         const shouldCreateNewWeek = shouldCreateNewWeekLogic(latestWeek, currentWeek, currentYear);
-        
+
         if (shouldCreateNewWeek) {
-          // Load current week from ESPN and prepare for new save
           setUploadMessage('Creating new week from ESPN...');
           setTimeout(() => setUploadMessage(''), 2000);
-          await loadCurrentWeekGames();
+          // Copy previous week's players (reset picks/tiebreaker)
+          const prevPlayers = await getPreviousWeekPlayers();
+          await loadCurrentWeekGames(prevPlayers);
           setCurrentGistId(null); // Ensure new gist is created
         } else if (latestWeek) {
           // Load latest existing week
@@ -531,167 +564,170 @@ const App = () => {
     return false;
   };
 
-  const loadCurrentWeekGames = async () => {
+  // Accepts optional players array to use for new week
+  const loadCurrentWeekGames = async (playersFromPrev) => {
     try {
       const currentWeek = getCurrentNFLWeek();
       setWeekNumber(currentWeek);
-      
-      const apiUrl = `${espnApiUrl}?dates=${year}&seasontype=${seasonType}&week=${currentWeek}`;
-      const response = await fetch(apiUrl);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch games from ESPN');
-      }
 
-      const data = await response.json();
-      
-      if (!data.events || data.events.length === 0) {
-        setUploadMessage('⚠️ No games found for current week. Please upload a pick sheet or check the week/season settings.');
-        setTimeout(() => setUploadMessage(''), 5000);
-        return;
-      }
+        const apiUrl = `${espnApiUrl}?dates=${year}&seasontype=${seasonType}&week=${currentWeek}`;
+        const response = await fetch(apiUrl);
 
-      // Create team name normalization function
-      const normalizeTeamName = (teamName) => {
-        const teamMap = {
-          'Steelers': 'Pittsburgh',
-          'Pittsburgh Steelers': 'Pittsburgh',
-          'Bengals': 'Cincinnati', 
-          'Cincinnati Bengals': 'Cincinnati',
-          'Rams': 'LA Rams',
-          'Los Angeles Rams': 'LA Rams',
-          'Jaguars': 'Jacksonville',
-          'Jacksonville Jaguars': 'Jacksonville',
-          'Saints': 'New Orleans',
-          'New Orleans Saints': 'New Orleans',
-          'Bears': 'Chicago',
-          'Chicago Bears': 'Chicago',
-          'Dolphins': 'Miami',
-          'Miami Dolphins': 'Miami',
-          'Browns': 'Cleveland',
-          'Cleveland Browns': 'Cleveland',
-          'Patriots': 'New England',
-          'New England Patriots': 'New England',
-          'Titans': 'Tennessee',
-          'Tennessee Titans': 'Tennessee',
-          'Raiders': 'Las Vegas',
-          'Las Vegas Raiders': 'Las Vegas',
-          'Chiefs': 'Kansas City',
-          'Kansas City Chiefs': 'Kansas City',
-          'Eagles': 'Philadelphia',
-          'Philadelphia Eagles': 'Philadelphia',
-          'Vikings': 'Minnesota',
-          'Minnesota Vikings': 'Minnesota',
-          'Panthers': 'Carolina',
-          'Carolina Panthers': 'Carolina',
-          'Jets': 'NY Jets',
-          'New York Jets': 'NY Jets',
-          'Giants': 'NY Giants',
-          'New York Giants': 'NY Giants',
-          'Broncos': 'Denver',
-          'Denver Broncos': 'Denver',
-          'Colts': 'Indianapolis',
-          'Indianapolis Colts': 'Indianapolis',
-          'Chargers': 'LA Chargers',
-          'Los Angeles Chargers': 'LA Chargers',
-          'Commanders': 'Washington',
-          'Washington Commanders': 'Washington',
-          'Cowboys': 'Dallas',
-          'Dallas Cowboys': 'Dallas',
-          'Packers': 'Green Bay',
-          'Green Bay Packers': 'Green Bay',
-          'Cardinals': 'Arizona',
-          'Arizona Cardinals': 'Arizona',
-          'Falcons': 'Atlanta',
-          'Atlanta Falcons': 'Atlanta',
-          '49ers': 'San Francisco',
-          'San Francisco 49ers': 'San Francisco',
-          'Buccaneers': 'Tampa Bay',
-          'Tampa Bay Buccaneers': 'Tampa Bay',
-          'Lions': 'Detroit',
-          'Detroit Lions': 'Detroit',
-          'Texans': 'Houston',
-          'Houston Texans': 'Houston',
-          'Seahawks': 'Seattle',
-          'Seattle Seahawks': 'Seattle',
-          'Ravens': 'Baltimore',
-          'Baltimore Ravens': 'Baltimore',
-          'Bills': 'Buffalo',
-          'Buffalo Bills': 'Buffalo'
-        };
-        return teamMap[teamName] || teamName;
-      };
-
-      // Convert ESPN events to our game format
-      const parsedGames = data.events.map((event, index) => {
-        const competition = event.competitions[0];
-        const homeTeam = competition.competitors.find(c => c.homeAway === 'home');
-        const awayTeam = competition.competitors.find(c => c.homeAway === 'away');
-        
-        const gameDate = new Date(event.date);
-        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const day = dayNames[gameDate.getDay()];
-        
-        const time = gameDate.toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
-        });
-
-        const homeScore = parseInt(homeTeam.score) || 0;
-        const awayScore = parseInt(awayTeam.score) || 0;
-        const status = competition.status.type.name;
-        
-        let winner = null;
-        let gameStatus = 'scheduled';
-        
-        if (status === 'STATUS_FINAL') {
-          winner = homeScore > awayScore ? normalizeTeamName(homeTeam.team.displayName) : normalizeTeamName(awayTeam.team.displayName);
-          gameStatus = 'final';
-        } else if (status === 'STATUS_IN_PROGRESS') {
-          winner = homeScore > awayScore ? normalizeTeamName(homeTeam.team.displayName) : (awayScore > homeScore ? normalizeTeamName(awayTeam.team.displayName) : null);
-          gameStatus = 'in-progress';
+        if (!response.ok) {
+          throw new Error('Failed to fetch games from ESPN');
         }
 
-        return {
-          id: index + 1,
-          awayTeam: normalizeTeamName(awayTeam.team.displayName),
-          homeTeam: normalizeTeamName(homeTeam.team.displayName),
-          day,
-          time,
-          winner,
-          homeScore: gameStatus !== 'scheduled' ? homeScore : undefined,
-          awayScore: gameStatus !== 'scheduled' ? awayScore : undefined,
-          status: gameStatus
+        const data = await response.json();
+
+        if (!data.events || data.events.length === 0) {
+          setUploadMessage('⚠️ No games found for current week. Please upload a pick sheet or check the week/season settings.');
+          setTimeout(() => setUploadMessage(''), 5000);
+          return;
+        }
+
+        // Create team name normalization function
+        const normalizeTeamName = (teamName) => {
+          const teamMap = {
+            'Steelers': 'Pittsburgh',
+            'Pittsburgh Steelers': 'Pittsburgh',
+            'Bengals': 'Cincinnati',
+            'Cincinnati Bengals': 'Cincinnati',
+            'Rams': 'LA Rams',
+            'Los Angeles Rams': 'LA Rams',
+            'Jaguars': 'Jacksonville',
+            'Jacksonville Jaguars': 'Jacksonville',
+            'Saints': 'New Orleans',
+            'New Orleans Saints': 'New Orleans',
+            'Bears': 'Chicago',
+            'Chicago Bears': 'Chicago',
+            'Dolphins': 'Miami',
+            'Miami Dolphins': 'Miami',
+            'Browns': 'Cleveland',
+            'Cleveland Browns': 'Cleveland',
+            'Patriots': 'New England',
+            'New England Patriots': 'New England',
+            'Titans': 'Tennessee',
+            'Tennessee Titans': 'Tennessee',
+            'Raiders': 'Las Vegas',
+            'Las Vegas Raiders': 'Las Vegas',
+            'Chiefs': 'Kansas City',
+            'Kansas City Chiefs': 'Kansas City',
+            'Eagles': 'Philadelphia',
+            'Philadelphia Eagles': 'Philadelphia',
+            'Vikings': 'Minnesota',
+            'Minnesota Vikings': 'Minnesota',
+            'Panthers': 'Carolina',
+            'Carolina Panthers': 'Carolina',
+            'Jets': 'NY Jets',
+            'New York Jets': 'NY Jets',
+            'Giants': 'NY Giants',
+            'New York Giants': 'NY Giants',
+            'Broncos': 'Denver',
+            'Denver Broncos': 'Denver',
+            'Colts': 'Indianapolis',
+            'Indianapolis Colts': 'Indianapolis',
+            'Chargers': 'LA Chargers',
+            'Los Angeles Chargers': 'LA Chargers',
+            'Commanders': 'Washington',
+            'Washington Commanders': 'Washington',
+            'Cowboys': 'Dallas',
+            'Dallas Cowboys': 'Dallas',
+            'Packers': 'Green Bay',
+            'Green Bay Packers': 'Green Bay',
+            'Cardinals': 'Arizona',
+            'Arizona Cardinals': 'Arizona',
+            'Falcons': 'Atlanta',
+            'Atlanta Falcons': 'Atlanta',
+            '49ers': 'San Francisco',
+            'San Francisco 49ers': 'San Francisco',
+            'Buccaneers': 'Tampa Bay',
+            'Tampa Bay Buccaneers': 'Tampa Bay',
+            'Lions': 'Detroit',
+            'Detroit Lions': 'Detroit',
+            'Texans': 'Houston',
+            'Houston Texans': 'Houston',
+            'Seahawks': 'Seattle',
+            'Seattle Seahawks': 'Seattle',
+            'Ravens': 'Baltimore',
+            'Baltimore Ravens': 'Baltimore',
+            'Bills': 'Buffalo',
+            'Buffalo Bills': 'Buffalo'
+          };
+          return teamMap[teamName] || teamName;
         };
-      });
 
-      // Extract team standings from game data
-      const standings = {};
-      data.events.forEach(event => {
-        event.competitions[0].competitors.forEach(competitor => {
-          const teamName = normalizeTeamName(competitor.team.displayName);
-          const record = competitor.records?.find(r => r.type === 'total');
-          if (teamName && record && record.summary) {
-            const [wins, losses] = record.summary.split('-').map(n => parseInt(n) || 0);
-            standings[teamName] = { wins, losses };
+        // Convert ESPN events to our game format
+        const parsedGames = data.events.map((event, index) => {
+          const competition = event.competitions[0];
+          const homeTeam = competition.competitors.find(c => c.homeAway === 'home');
+          const awayTeam = competition.competitors.find(c => c.homeAway === 'away');
+
+          const gameDate = new Date(event.date);
+          const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+          const day = dayNames[gameDate.getDay()];
+
+          const time = gameDate.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          });
+
+          const homeScore = parseInt(homeTeam.score) || 0;
+          const awayScore = parseInt(awayTeam.score) || 0;
+          const status = competition.status.type.name;
+
+          let winner = null;
+          let gameStatus = 'scheduled';
+
+          if (status === 'STATUS_FINAL') {
+            winner = homeScore > awayScore ? normalizeTeamName(homeTeam.team.displayName) : normalizeTeamName(awayTeam.team.displayName);
+            gameStatus = 'final';
+          } else if (status === 'STATUS_IN_PROGRESS') {
+            winner = homeScore > awayScore ? normalizeTeamName(homeTeam.team.displayName) : (awayScore > homeScore ? normalizeTeamName(awayTeam.team.displayName) : null);
+            gameStatus = 'in-progress';
           }
+
+          return {
+            id: index + 1,
+            awayTeam: normalizeTeamName(awayTeam.team.displayName),
+            homeTeam: normalizeTeamName(homeTeam.team.displayName),
+            day,
+            time,
+            winner,
+            homeScore: gameStatus !== 'scheduled' ? homeScore : undefined,
+            awayScore: gameStatus !== 'scheduled' ? awayScore : undefined,
+            status: gameStatus
+          };
         });
-      });
 
-      setGames(parsedGames);
-      setTeamStandings(standings);
-      setIsAdminMode(false);
-      setUploadMessage(`✓ Loaded ${parsedGames.length} games for Week ${currentWeek} from ESPN`);
-      setTimeout(() => setUploadMessage(''), 4000);
-      
-    } catch (error) {
-      console.error('Error loading current week games:', error);
-      setUploadMessage(`⚠️ Could not load current week games from ESPN: ${error.message}. Please upload a pick sheet manually.`);
-      setTimeout(() => setUploadMessage(''), 6000);
+        // Extract team standings from game data
+        const standings = {};
+        data.events.forEach(event => {
+          event.competitions[0].competitors.forEach(competitor => {
+            const teamName = normalizeTeamName(competitor.team.displayName);
+            const record = competitor.records?.find(r => r.type === 'total');
+            if (teamName && record && record.summary) {
+              const [wins, losses] = record.summary.split('-').map(n => parseInt(n) || 0);
+              standings[teamName] = { wins, losses };
+            }
+          });
+        });
+
+        setGames(parsedGames);
+        setTeamStandings(standings);
+        setIsAdminMode(false);
+        if (Array.isArray(playersFromPrev)) {
+          setPlayers(playersFromPrev);
+        }
+        setUploadMessage(`✓ Loaded ${parsedGames.length} games for Week ${currentWeek} from ESPN`);
+        setTimeout(() => setUploadMessage(''), 4000);
+
+      } catch (error) {
+        console.error('Error loading current week games:', error);
+        setUploadMessage(`⚠️ Could not load current week games from ESPN: ${error.message}. Please upload a pick sheet manually.`);
+        setTimeout(() => setUploadMessage(''), 6000);
+      }
     }
-  };
-
   const exportData = () => {
     const data = {
       games,
