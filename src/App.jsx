@@ -26,7 +26,13 @@ const App = () => {
   // Calculate current NFL week (Tuesday-Monday cycle)
   const getCurrentNFLWeek = () => {
     const now = new Date();
-    const year = now.getFullYear();
+    let year = now.getFullYear();
+    const month = now.getMonth(); // 0-indexed: 0=Jan, 1=Feb, etc.
+    
+    // If we're in January or early February, we're still in the previous year's season
+    if (month <= 1) {
+      year = year - 1;
+    }
     
     // NFL season typically starts first Thursday in September
     // Week 1 starts on the Tuesday before that Thursday
