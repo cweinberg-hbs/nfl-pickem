@@ -119,9 +119,10 @@ const App = () => {
 
   const loadFromStorage = () => {
     try {
-      // Load games
+      // Only load from session storage if no GitHub token (no cloud available)
+      // If we have a token, cloud data will load and override this anyway
       const savedGames = sessionStorage.getItem('pickem-games');
-      if (savedGames) {
+      if (savedGames && !githubToken) {
         const loadedGames = JSON.parse(savedGames);
         setGames(loadedGames);
         setIsAdminMode(false);
@@ -419,17 +420,11 @@ const App = () => {
   };
 
   // Load week history when component mounts (if token is available)
+  // Smart loading on mount: always check cloud first, ignore session storage
   React.useEffect(() => {
-    if (githubToken && !isLoading) {
-      loadWeekHistory();
-    }
-  }, [isLoading]);
-
-  // Smart loading: prioritize cloud storage, handle new week logic
-  React.useEffect(() => {
-    if (!isLoading && games.length === 0 && githubToken) {
+    if (!isLoading && githubToken) {
       smartLoadWeek();
-    } else if (!isLoading && games.length === 0 && !githubToken) {
+    } else if (!isLoading && !githubToken && games.length === 0) {
       loadCurrentWeekGames();
     }
   }, [isLoading, githubToken]);
@@ -471,7 +466,10 @@ const App = () => {
       setWeekHistory(pickemGists);
 
       const currentWeek = getCurrentNFLWeek();
-      const currentYear = new Date().getFullYear().toString();
+      // If we're in Jan/Feb, the NFL season year is the previous calendar year
+      const now = new Date();
+      const month = now.getMonth();
+      const currentYear = (month <= 1 ? now.getFullYear() - 1 : now.getFullYear()).toString();
 
       // Check if current week exists in cloud
       const existingWeek = pickemGists.find(
