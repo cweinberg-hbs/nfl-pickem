@@ -346,7 +346,7 @@ const App = () => {
         response = await fetch(`https://api.github.com/gists/${existingGist.id}`, {
           method: 'PATCH',
           headers: {
-            'Authorization': `token ${githubToken}`,
+            'Authorization': `Bearer ${githubToken}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify(gistData)
@@ -357,7 +357,7 @@ const App = () => {
         response = await fetch('https://api.github.com/gists', {
           method: 'POST',
           headers: {
-            'Authorization': `token ${githubToken}`,
+            'Authorization': `Bearer ${githubToken}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify(gistData)
@@ -386,7 +386,7 @@ const App = () => {
     try {
       const response = await fetch('https://api.github.com/gists', {
         headers: {
-          'Authorization': `token ${githubToken}`,
+          'Authorization': `Bearer ${githubToken}`,
           'Content-Type': 'application/json'
         }
       });
@@ -413,7 +413,7 @@ const App = () => {
     try {
       const response = await fetch(`https://api.github.com/gists/${gistId}`, {
         headers: {
-          'Authorization': `token ${githubToken}`,
+          'Authorization': `Bearer ${githubToken}`,
           'Content-Type': 'application/json'
         }
       });
@@ -459,7 +459,7 @@ const App = () => {
     try {
       const response = await fetch('https://api.github.com/gists', {
         headers: {
-          'Authorization': `token ${githubToken}`,
+          'Authorization': `Bearer ${githubToken}`,
           'Content-Type': 'application/json'
         }
       });
@@ -498,7 +498,7 @@ const App = () => {
       // First, load week history to see what we have
       const response = await fetch('https://api.github.com/gists', {
         headers: {
-          'Authorization': `token ${githubToken}`,
+          'Authorization': `Bearer ${githubToken}`,
           'Content-Type': 'application/json'
         }
       });
@@ -552,7 +552,7 @@ const App = () => {
         try {
           const resp = await fetch(`https://api.github.com/gists/${prev.id}`, {
             headers: {
-              'Authorization': `token ${githubToken}`,
+              'Authorization': `Bearer ${githubToken}`,
               'Content-Type': 'application/json'
             }
           });
@@ -1112,6 +1112,7 @@ const App = () => {
 
       // Day patterns to detect
       const dayPatterns = {
+        'Wednesday': /Wednesday/i,
         'Thursday': /Thursday/i,
         'Friday': /Friday/i,
         'Saturday': /Saturday/i,
@@ -1686,7 +1687,7 @@ const App = () => {
               </div>
 
               {/* Games by Day */}
-              {['Thursday', 'Friday', 'Saturday', 'Sunday', 'Monday'].map(day => {
+              {['Wednesday','Thursday', 'Friday', 'Saturday', 'Sunday', 'Monday'].map(day => {
                 const dayGames = games.filter(g => g.day === day);
                 if (dayGames.length === 0) return null;
 
