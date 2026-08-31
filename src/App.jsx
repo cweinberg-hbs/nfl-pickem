@@ -23,8 +23,72 @@ const App = () => {
   // Get GitHub token from environment variable (secure)
   const githubToken = import.meta.env.VITE_GITHUB_TOKEN;
 
+   // Calculate current NFL week by fetching Week 1's actual start date from ESPN
+  const getCurrentNFLWeek = async () => {
+    try {
+      const now = new Date();
+      let seasonYear = now.getFullYear();
+      const month = now.getMonth(); // 0-indexed: 0=Jan, 1=Feb, etc.
+
+      // If we're in January or early February, we're still in the previous year's season
+      if (month <= 1) {
+        seasonYear = seasonYear - 1;
+      }
+
+      // Fetch Week 1 of the regular season to find the real first game date
+      const week1Url = `${espnApiUrl}?seasontype=2&week=1&dates=${seasonYear}`;
+      const response = await fetch(week1Url);
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch Week 1 schedule from ESPN');
+      }
+
+      const data = await response.json();
+
+      if (!data.events || data.events.length === 0) {
+        throw new Error('No Week 1 events returned from ESPN');
+      }
+
+      // Find the earliest kickoff among Week 1 events (the season's actual opening game)
+      const gameDates = data.events.map(event => new Date(event.date));
+      const firstGameDate = new Date(Math.min(...gameDates.map(d => d.getTime())));
+
+      // NFL weeks run Tuesday-Monday, so Week 1 "starts" the Tuesday before the first game
+      const dayOfWeek = firstGameDate.getDay(); // 0=Sun, 1=Mon, 2=Tue, ...
+      const daysSinceTuesday = (dayOfWeek - 2 + 7) % 7;
+      const week1Start = new Date(firstGameDate);
+      week1Start.setDate(firstGameDate.getDate() - daysSinceTuesday);
+      week1Start.setHours(0, 0, 0, 0);
+
+      // Calculate weeks elapsed since Week 1 start
+      const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+      const weeksSinceStart = Math.floor((now - week1Start) / msPerWeek);
+
+      // NFL regular season is weeks 1-18
+      const currentWeek = Math.max(1, Math.min(18, weeksSinceStart + 1));
+      return currentWeek.toString();
+    } catch (error) {
+      console.error('Error determining current NFL week from ESPN, using fallback estimate:', error);
+
+      // Fallback: rough estimate (first Thursday in September) if ESPN is unreachable
+      const now = new Date();
+      let year = now.getFullYear();
+      const month = now.getMonth();
+      if (month <= 1) year = year - 1;
+
+      const seasonStart = new Date(year, 8, 1);
+      const firstThursday = new Date(seasonStart);
+      firstThursday.setDate(1 + ((4 - seasonStart.getDay() + 7) % 7));
+      const week1Start = new Date(firstThursday);
+      week1Start.setDate(firstThursday.getDate() - 2);
+
+      const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+      const weeksSinceStart = Math.floor((now - week1Start) / msPerWeek);
+      return Math.max(1, Math.min(18, weeksSinceStart + 1)).toString();
+    }
+  };
   // Calculate current NFL week (Tuesday-Monday cycle)
-  const getCurrentNFLWeek = () => {
+  /* const getCurrentNFLWeek = () => {
     const now = new Date();
     let year = now.getFullYear();
     const month = now.getMonth(); // 0-indexed: 0=Jan, 1=Feb, etc.
@@ -49,7 +113,7 @@ const App = () => {
     // NFL regular season is weeks 1-18
     const currentWeek = Math.max(1, Math.min(18, weeksSinceStart + 1));
     return currentWeek.toString();
-  };
+  }; */
 
   // Load data from session storage on mount
   React.useEffect(() => {
@@ -465,7 +529,7 @@ const App = () => {
 
       setWeekHistory(pickemGists);
 
-      const currentWeek = getCurrentNFLWeek();
+      const currentWeek = await getCurrentNFLWeek();
       // If we're in Jan/Feb, the NFL season year is the previous calendar year
       const now = new Date();
       const month = now.getMonth();
@@ -571,7 +635,7 @@ const App = () => {
   // Accepts optional players array to use for new week
   const loadCurrentWeekGames = async (playersFromPrev) => {
     try {
-      const currentWeek = getCurrentNFLWeek();
+      const currentWeek = await getCurrentNFLWeek();
       setWeekNumber(currentWeek);
 
         const apiUrl = `${espnApiUrl}?dates=${year}&seasontype=${seasonType}&week=${currentWeek}`;
